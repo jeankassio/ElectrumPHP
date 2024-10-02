@@ -3,6 +3,7 @@ namespace JeanKassio;
 
 class ElectrumPHP{
 	
+    private $binary;
     private $url;
     private $user;
     private $pass;
@@ -10,7 +11,9 @@ class ElectrumPHP{
 	private $wallet;
 	private $walletpass;
 	
-    public function __construct($walletPath, $walletPass, $user, $pass, $port, $host = '127.0.0.1'){
+    public function __construct($walletPath, $walletPass, $user, $pass, $port, $host = '127.0.0.1', $binary = false){
+		
+		putenv("PATH=/home/www/.local/bin:/usr/local/bin:/usr/bin:/bin");
 		
         $this->user = $user;
         $this->pass = $pass;
@@ -18,6 +21,7 @@ class ElectrumPHP{
         $this->wallet = $walletPath;
         $this->walletpass = $walletPass;
         $this->url = "http://$host:$port";
+		$this->binary = (!$binary ? $this->getBinary() : $binary);
 		
     }
 	
@@ -26,14 +30,24 @@ class ElectrumPHP{
 	 *	$rpcpass:	Password RPC;
 	 *	$rpcport:	Port Used By RPC;
 	 */
-	public function start($rpcuser = null, $rpcpass = null, $rpcport = null){
+	public function start(){
 		
 		if(!$this->isRunning()){
 			
 			$params = "-d --rpcuser '{$this->user}' --rpcpassword '{$this->pass}' --rpcport {$this->port}";
 			
-			$output = shell_exec("electrum daemon {$params}");
-			if(str_contains($output, 'starting daemon')){
+			$output = NULL;
+			$code = null;
+			
+			exec("{$this->binary} daemon {$params} 2>&1", $output, $code);
+			
+			if(is_null($output)){
+				return false;
+			}
+			
+			$output = implode(" ", $output);
+			
+			if(str_contains($output, 'starting daemon') || str_contains($output, 'already running')){
 				return true;
 			}else{
 				throw new \Exception('Could not start Electrum daemon.');
@@ -48,12 +62,16 @@ class ElectrumPHP{
     public function stop(){
 		
 		if($this->isRunning()){
-			$output = shell_exec("electrum stop");
-			if(str_contains($output, 'Daemon stopped')){
+			
+			$params = [];
+			$response = $this->call("stop", $params);
+			
+			if(!is_array($response) && (str_contains($response, 'Daemon stopped') || str_contains($response, 'Connection refused'))){
 				return true;
 			}else{
 				throw new \Exception('Could not stop Electrum daemon.');
 			}
+			
 		}else{
 			return true;
 		}
@@ -72,7 +90,9 @@ class ElectrumPHP{
 	
 	public function closeWallet(){
 		
-		$params = [$this->wallet];
+		$params = [
+			'wallet_path' => $this->wallet
+		];
 		return $this->call("close_wallet", $params);
 		
 	}
@@ -91,14 +111,23 @@ class ElectrumPHP{
 		try{
 			
 			$seed = ($setSeed ?? $this->makeSeed($segwit, $language, $entropy));
-			$params = [$seed, $password, $encrypt, ($segwit ? "segwit" : "standard"), $walletPath];
+			$params = [
+				'passphrase' => $seed, 
+				'password' => $password, 
+				'encrypt_file' => $encrypt, 
+				'seed_type' => ($segwit ? "segwit" : "standard"), 
+				'wallet_path' => $walletPath
+			];
 			
 			$response = $this->call("create", $params);
 			
-			if(str_contains($response, 'path')){
+			if(is_array($response) && isset($response['path'])){
+				
 				$this->wallet = $walletPath;
 				$this->walletpass = $password;
-				return json_decode($response, true);
+				
+				return $response;
+				
 			}else{
 				return false;
 			}
@@ -116,14 +145,20 @@ class ElectrumPHP{
 	 */
 	public function makeSeed($segwit = true, $language = "english", $entropy = 256){
 		
-		$params = [$entropy, $language, ($segwit ? "segwit" : "standard")];
+		$params = [
+			'nbits' => $entropy, 
+			'language' => $language, 
+			'seed_type' => ($segwit ? "segwit" : "standard")
+		];
 		return $this->call("make_seed", $params);
 		
 	}
 	
 	public function createAddress(){
 		
-		$params = [$this->wallet];
+		$params = [
+			'wallet' => $this->wallet
+		];
 		return $this->call("createnewaddress", $params);
 		
 	}
@@ -133,7 +168,9 @@ class ElectrumPHP{
 	 */
 	public function getAddressBalance($address){
 		
-		$params = [$address];
+		$params = [
+			'address' => $address
+		];
 		return $this->call("getaddressbalance", $params);
 		
 	}
@@ -143,14 +180,18 @@ class ElectrumPHP{
 	 */
 	public function getAddressHistory($address){
 		
-		$params = [$address];
+		$params = [
+			'address' => $address
+		];
 		return $this->call("getaddresshistory", $params);
 		
 	}
 	
 	public function getWalletBalance(){
 		
-		$params = [$this->wallet];
+		$params = [
+			'wallet' => $this->wallet
+		];
 		return $this->call("getbalance", $params);
 		
 	}
@@ -168,7 +209,10 @@ class ElectrumPHP{
 	 */
 	public function notify($address, $url){
 		
-		$params = [$address, $url];
+		$params = [
+			'address' => $address, 
+			'URL' => $url
+		];
 		return $this->call("notify", $params);
 		
 	}
@@ -178,7 +222,9 @@ class ElectrumPHP{
 	 */
 	public function deleteNotify($address){
 		
-		$params = [$address];
+		$params = [
+			'address' => $address
+		];
 		return $this->call("notify", $params);
 		
 	}
@@ -188,14 +234,21 @@ class ElectrumPHP{
 	 */
 	public function getPrivateKeys($address){
 		
-		$params = [$address, $this->walletpass, $this->wallet];
+		$params = [
+			'address' => $address, 
+			'password' => $this->walletpass, 
+			'wallet' => $this->wallet
+		];
 		return $this->call("getprivatekeys", $params);
 		
 	}
 	
 	public function getSeed(){
 		
-		$params = [$this->walletpass, $this->wallet];
+		$params = [
+			'password' => $this->walletpass, 
+			'wallet' => $this->wallet
+		];
 		return $this->call("getseed", $params);
 		
 	}
@@ -205,7 +258,11 @@ class ElectrumPHP{
 	 */
 	public function importPrivKey($privateKey){
 		
-		$params = [$privateKey, $this->walletpass, $this->wallet];
+		$params = [
+			'privkey' => $privateKey, 
+			'password' => $this->walletpass, 
+			'wallet' => $this->wallet
+		];
 		return $this->call("importprivkey", $params);
 		
 	}
@@ -215,14 +272,19 @@ class ElectrumPHP{
 	 */
 	public function getTransaction($txid){
 		
-		$params = [$txid, $this->wallet];
+		$params = [
+			'txid' => $txid, 
+			'wallet' => $this->wallet
+		];
 		return $this->call("gettransaction", $params);
 		
 	}
 	
 	public function checkSyncronization(){
 		
-		$params = [$this->wallet];
+		$params = [
+			'wallet' => $this->wallet
+		];
 		return $this->call("is_synchronized", $params);
 		
 	}
@@ -236,7 +298,16 @@ class ElectrumPHP{
 	
 	public function getAddressesWallet(){
 		
-		$params = [false, false, false, false, false, false, false, $this->wallet];
+		$params = [
+			'receiving' => false, 
+			'change' => false, 
+			'labels' => false, 
+			'frozen' => false, 
+			'unused' => false, 
+			'funded' => false, 
+			'balance' => false, 
+			'wallet' => $this->wallet
+		];
 		return $this->call("listaddresses", $params);
 		
 	}
@@ -255,13 +326,28 @@ class ElectrumPHP{
 	 */
 	public function pay($address, $amount, $fee = null, $feerate = null, $fromAddr = null, $fromCoins = null, $change = null, $nocheck = false, $unsigned = false, $replaceByFee = true){
 		
-		$params = [$address, $amount, $fee, $feerate, $fromAddr, $fromCoins, $change, $nocheck, $unsigned, $replaceByFee, $this->walletpass, NULL, true, $this->wallet];
+		$params = [
+			'destination' => $address, 
+			'amount' => $amount, 
+			'fee' => $fee, 
+			'feerate' => $feerate, 
+			'from_addr' => $fromAddr, 
+			'from_coins' => $fromCoins, 
+			'change_addr' => $change, 
+			'nocheck' => $nocheck, 
+			'unsigned' => $unsigned, 
+			'rbf' => $replaceByFee, 
+			'password' => $this->walletpass, 
+			'locktime' => NULL, 
+			'addtransaction' => true, 
+			'wallet' => $this->wallet
+		];
 		return $this->call("payto", $params);
 		
 	}
 	
 	/*
-	 *	$addresses:	Addresses and values to send -> [["addr", 0.001],["addr", 0.2]]
+	 *	$outputs:	Addresses and values to send -> [["addr", 0.001],["addr", 0.2]]
 	 *	$fee:		Fee in BTC to send;
 	 *	$feerate:	Feerate to send Bitcoins;
 	 *	$fromAddr:	Choose one address to get the Bitcoins;
@@ -271,29 +357,40 @@ class ElectrumPHP{
 	 *	$unsigned:	Unsigned val;
 	 *	$replaceByFee:	Activate the RBF mode in transaction;
 	 */
-	public function payToMany($addresses, $fee = null, $feerate = null, $fromAddr = null, $fromCoins = null, $change = null, $nocheck = false, $unsigned = false, $replaceByFee = true){
+	public function payToMany($outputs, $fee = null, $feerate = null, $fromAddr = null, $fromCoins = null, $change = null, $nocheck = false, $unsigned = false, $replaceByFee = true){
 		
-		$params = [$addresses, $fee, $feerate, $fromAddr, $fromCoins, $change, $nocheck, $unsigned, $replaceByFee, $this->walletpass, NULL, true, $this->wallet];
+		$params = [
+			'outputs' => $outputs, 
+			'fee' => $fee, 
+			'feerate' => $feerate, 
+			'from_addr' => $fromAddr, 
+			'from_coins' => $fromCoins, 
+			'change_addr' => $change, 
+			'nocheck' => $nocheck, 
+			'unsigned' => $unsigned, 
+			'rbf' => $replaceByFee, 
+			'password' => $this->walletpass, 
+			'locktime' => NULL, 
+			'addtransaction' => true, 
+			'wallet' => $this->wallet
+		];
 		return $this->call("payto", $params);
 		
 	}
 	
-	/*
-     *    $walletPath:	Wallet path;
-	 *	$password: 		Wallet password;
-	 */
-	public function loadWallet($walletPath, $password = NULL){
+	public function loadWallet(){
 		
-		$params = [$walletPath, $password];
+		$params = [
+			'wallet_path' => $this->wallet, 
+			'password' => $this->walletpass
+		];
         $response = $this->call('load_wallet', $params);
 		
-		if(!str_contains($response, 'Traceback')){
-			$this->wallet = $walletPath;
-			$this->walletpass = $password;
-			return true;
-		}else{
-			return false;
+		if(is_array($response)){
+			$response = implode(" ", $response);
 		}
+		
+		return (is_null($response));
 		
     }
 	
@@ -301,16 +398,13 @@ class ElectrumPHP{
         
 		try{
 			
-			$status = shell_exec("electrum getinfo");
-		
-			if(str_contains($status, 'Daemon not running')){
+			$params = [];
+			$response = $this->call("getinfo", $params);
+			
+			if(is_null($response) || empty($response) || str_contains(implode(" ", $response), 'Daemon not running') || str_contains(implode(" ", $response), 'Connection refused')){
 				return false;
 			}else{
-				
-				$result = json_decode($status, true);
-				
-				return (isset($result['connected']) && $result['connected']);
-				
+				return (isset($response['connected']) && $response['connected']);
 			}
 			
 		}catch(Throwable $e){
@@ -318,6 +412,22 @@ class ElectrumPHP{
 		}
 		
     }
+	
+	private function getBinary(){
+		
+		$output = null;
+		
+		exec("which electrum", $output);
+		
+		if(is_array($output) && count($output) > 0){
+			
+			return $output[0];
+			
+		}else{
+			throw new \Exception('Unable to locate Electrum binary.');
+		}
+		
+	}
 	
     private function call($method, $params = []){
         $payload = json_encode([
@@ -340,7 +450,7 @@ class ElectrumPHP{
         $response = curl_exec($ch);
 		
         if(curl_errno($ch)){
-            throw new \Exception('Curl error: ' . curl_error($ch));
+			return false;
         }
 		
         curl_close($ch);
@@ -352,6 +462,7 @@ class ElectrumPHP{
         }
 
         return ($decodedResponse['result'] ?? null);
+		
     }
 	
 }
