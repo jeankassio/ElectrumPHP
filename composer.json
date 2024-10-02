@@ -2,6 +2,7 @@
     "name": "jeankassio/electrumphp",
     "description": "PHP library to connect in Electrum JSON-RPC",
     "type": "library",
+	"license": "MIT",
     "require": {
         "php": ">=7.4"
     },
