@@ -1,5 +1,5 @@
 <?php
-namespace JeanKassio\ElectrumPHP;
+namespace JeanKassio;
 
 class ElectrumPHP{
 	
@@ -8,22 +8,24 @@ class ElectrumPHP{
     private $pass;
 	private $port;
 	private $wallet;
+	private $walletpass;
 	
-    public function __construct($walletPath, $user, $pass, $port, $host = '127.0.0.1'){
+    public function __construct($walletPath, $walletPass, $user, $pass, $port, $host = '127.0.0.1'){
 		
         $this->user = $user;
         $this->pass = $pass;
         $this->port = $port;
         $this->wallet = $walletPath;
+        $this->walletpass = $walletPass;
         $this->url = "http://$host:$port";
 		
     }
 	
 	/*
-		$rpcuser:	User RPC;
-		$rpcpass:	Password RPC;
-		$rpcport:	Port Used By RPC;
-	*/
+	 *	$rpcuser:	User RPC;
+	 *	$rpcpass:	Password RPC;
+	 *	$rpcport:	Port Used By RPC;
+	 */
 	public function start($rpcuser = null, $rpcpass = null, $rpcport = null){
 		
 		if(!$this->isRunning()){
@@ -31,7 +33,11 @@ class ElectrumPHP{
 			$params = "-d --rpcuser '{$this->user}' --rpcpassword '{$this->pass}' --rpcport {$this->port}";
 			
 			$output = shell_exec("electrum daemon {$params}");
-			return str_contains($output, 'starting daemon');
+			if(str_contains($output, 'starting daemon')){
+				return true;
+			}else{
+				throw new \Exception('Could not start Electrum daemon.');
+			}
 			
 		}else{
 			return true;
@@ -43,7 +49,11 @@ class ElectrumPHP{
 		
 		if($this->isRunning()){
 			$output = shell_exec("electrum stop");
-			return str_contains($output, 'Daemon stopped');
+			if(str_contains($output, 'Daemon stopped')){
+				return true;
+			}else{
+				throw new \Exception('Could not stop Electrum daemon.');
+			}
 		}else{
 			return true;
 		}
@@ -51,18 +61,15 @@ class ElectrumPHP{
     }
 	
 	/*
-		$method:	Method used;
-		$params:	Method params;
-	*/
+	 *	$method:	Method used;
+	 *	$params:	Method params;
+	 */
 	public function custom($method, $params){
 		
 		return $this->call($method, $params);
 		
 	}
 	
-	/*
-		---
-	*/
 	public function closeWallet(){
 		
 		$params = [$this->wallet];
@@ -71,29 +78,42 @@ class ElectrumPHP{
 	}
 	
 	/*
-		$setSeed: 	string of seed choose by you, if false Electrum create for you and return this;
-		$password:	Password of wallet;
-		$segwit:	Boolean, if the wallet is Segwit;
-		$encrypt:	Boolean, if the wallet will be encrypted;
-		$language:	String, language of Seed to automatically create;
-		$entropy:	Entropy of Seed to automatically create;
-	*/
-	public function createWallet($setSeed = false, $password = null, $encrypt = true, $segwit = true, $language = "english", $entropy = 256){
+	 *	$walletPath:	path of wallet to create;
+	 *	$setSeed: 	string of seed choose by you, if false Electrum create for you and return this;
+	 *	$password:	Password of wallet;
+	 *	$segwit:	Boolean, if the wallet is Segwit;
+	 *	$encrypt:	Boolean, if the wallet will be encrypted;
+	 *	$language:	String, language of Seed to automatically create;
+	 *	$entropy:	Entropy of Seed to automatically create;
+	 */
+	public function createWallet($walletPath, $password = null, $setSeed = false, $encrypt = true, $segwit = true, $language = "english", $entropy = 256){
 		
-		$seed = ($setSeed ?? $this->makeSeed($segwit, $language, $entropy));
-		$params = [$seed, $password, $encrypt, ($segwit ? "segwit" : "standard"), $this->wallet];
-		return [
-			"seed" => $seed,
-			"response" => $this->call("create", $params)
-		];
+		try{
+			
+			$seed = ($setSeed ?? $this->makeSeed($segwit, $language, $entropy));
+			$params = [$seed, $password, $encrypt, ($segwit ? "segwit" : "standard"), $walletPath];
+			
+			$response = $this->call("create", $params);
+			
+			if(str_contains($response, 'path')){
+				$this->wallet = $walletPath;
+				$this->walletpass = $password;
+				return json_decode($response, true);
+			}else{
+				return false;
+			}
+			
+		}catch(Throwable $e){
+			return false;
+		}
 		
 	}
 	
 	/*
-		$segwit:	if the wallet is segwit;
-		$language:	String, language of Seed to automatically create;
-		$entropy:	Entropy of Seed to automatically create;
-	*/
+	 *	$segwit:	if the wallet is segwit;
+	 *	$language:	String, language of Seed to automatically create;
+	 *	$entropy:	Entropy of Seed to automatically create;
+	 */
 	public function makeSeed($segwit = true, $language = "english", $entropy = 256){
 		
 		$params = [$entropy, $language, ($segwit ? "segwit" : "standard")];
@@ -101,10 +121,6 @@ class ElectrumPHP{
 		
 	}
 	
-	
-	/*
-	    ---
-	*/
 	public function createAddress(){
 		
 		$params = [$this->wallet];
@@ -112,10 +128,9 @@ class ElectrumPHP{
 		
 	}
 	
-	
 	/*
-		$address:	A valid Bitcoin Address;
-	*/
+	 *	$address:	A valid Bitcoin Address;
+	 */
 	public function getAddressBalance($address){
 		
 		$params = [$address];
@@ -123,10 +138,9 @@ class ElectrumPHP{
 		
 	}
 	
-	
 	/*
-		$address:	A valid Bitcoin Address;
-	*/
+	 *	$address:	A valid Bitcoin Address;
+	 */
 	public function getAddressHistory($address){
 		
 		$params = [$address];
@@ -134,10 +148,6 @@ class ElectrumPHP{
 		
 	}
 	
-	
-	/*
-		---
-	*/
 	public function getWalletBalance(){
 		
 		$params = [$this->wallet];
@@ -145,10 +155,6 @@ class ElectrumPHP{
 		
 	}
 	
-	
-	/*
-		---
-	*/
 	public function getFeeRate(){
 		
 		$params = [];
@@ -156,11 +162,10 @@ class ElectrumPHP{
 		
 	}
 	
-	
 	/*
-		$address: 	A valid Bitcoin address;
-		$url:		A url to receive webhook of Electrum;
-	*/
+	 *	$address: 	A valid Bitcoin address;
+	 *	$url:		A url to receive webhook of Electrum;
+	 */
 	public function notify($address, $url){
 		
 		$params = [$address, $url];
@@ -168,10 +173,9 @@ class ElectrumPHP{
 		
 	}
 	
-	
 	/*
-		$address: 	A valid Bitcoin address;
-	*/
+	 *	$address: 	A valid Bitcoin address;
+	 */
 	public function deleteNotify($address){
 		
 		$params = [$address];
@@ -179,45 +183,36 @@ class ElectrumPHP{
 		
 	}
 	
-	
 	/*
-		$address: 	A valid Bitcoin address;
-		$password:	Password of wallet;
-	*/
-	public function getPrivateKeys($address, $password){
+	 *	$address: 	A valid Bitcoin address;
+	 */
+	public function getPrivateKeys($address){
 		
-		$params = [$address, $password, $this->wallet];
+		$params = [$address, $this->walletpass, $this->wallet];
 		return $this->call("getprivatekeys", $params);
 		
 	}
 	
-	
-	/*
-		$password:	Password of wallet;
-	*/
-	public function getSeed($password){
+	public function getSeed(){
 		
-		$params = [$password, $this->wallet];
+		$params = [$this->walletpass, $this->wallet];
 		return $this->call("getseed", $params);
 		
 	}
 	
-	
 	/*
-		$privateKey:	Bitcoin Private Key;
-		$password:	Password of wallet;
-	*/
-	public function importPrivKey($privateKey, $password){
+	 *	$privateKey:	Bitcoin Private Key;
+	 */
+	public function importPrivKey($privateKey){
 		
-		$params = [$privateKey, $password, $this->wallet];
+		$params = [$privateKey, $this->walletpass, $this->wallet];
 		return $this->call("importprivkey", $params);
 		
 	}
 	
-	
 	/*
-		$txid:	Your TXID;
-	*/
+	 *	$txid:	Your TXID;
+	 */
 	public function getTransaction($txid){
 		
 		$params = [$txid, $this->wallet];
@@ -225,9 +220,6 @@ class ElectrumPHP{
 		
 	}
 	
-	/*
-		---
-	*/
 	public function checkSyncronization(){
 		
 		$params = [$this->wallet];
@@ -235,9 +227,6 @@ class ElectrumPHP{
 		
 	}
 	
-	/*
-		---
-	*/
 	public function getWalletsOpen(){
 		
 		$params = [];
@@ -245,9 +234,6 @@ class ElectrumPHP{
 		
 	}
 	
-	/*
-		---
-	*/
 	public function getAddressesWallet(){
 		
 		$params = [false, false, false, false, false, false, false, $this->wallet];
@@ -256,54 +242,58 @@ class ElectrumPHP{
 	}
 	
 	/*
-		$address:	Send Bitcoins to this address;
-		$amount:	Amount in BTC to send;
-		$fee:		Fee in BTC to send;
-		$feerate:	Feerate to send Bitcoins;
-		$fromAddr:	Choose one address to get the Bitcoins;
-		$fromCoins:	Type of Coin to send (Null default);
-		$change:	Address to send change;
-		$nocheck:	No check transaction;
-		$unsigned:	Unsigned val;
-		$replaceByFee:	Activate the RBF mode in transaction;
-		$password:	Password of wallet;
-	*/
-	public function pay($address, $amount, $fee = null, $feerate = null, $fromAddr = null, $fromCoins = null, $change = null, $nocheck = false, $unsigned = false, $replaceByFee = true, $password = null){
+	 *	$address:	Send Bitcoins to this address;
+	 *	$amount:	Amount in BTC to send;
+	 *	$fee:		Fee in BTC to send;
+	 *	$feerate:	Feerate to send Bitcoins;
+	 *	$fromAddr:	Choose one address to get the Bitcoins;
+	 *	$fromCoins:	Type of Coin to send (Null default);
+	 *	$change:	Address to send change;
+	 *	$nocheck:	No check transaction;
+	 *	$unsigned:	Unsigned val;
+	 *	$replaceByFee:	Activate the RBF mode in transaction;
+	 */
+	public function pay($address, $amount, $fee = null, $feerate = null, $fromAddr = null, $fromCoins = null, $change = null, $nocheck = false, $unsigned = false, $replaceByFee = true){
 		
-		$params = [$address, $amount, $fee, $feerate, $fromAddr, $fromCoins, $change, $nocheck, $unsigned, $replaceByFee, $password, NULL, true, $this->wallet];
+		$params = [$address, $amount, $fee, $feerate, $fromAddr, $fromCoins, $change, $nocheck, $unsigned, $replaceByFee, $this->walletpass, NULL, true, $this->wallet];
 		return $this->call("payto", $params);
 		
 	}
 	
 	/*
-		$addresses:	Addresses and values to send -> [["addr", 0.001],["addr", 0.2]]
-		$fee:		Fee in BTC to send;
-		$feerate:	Feerate to send Bitcoins;
-		$fromAddr:	Choose one address to get the Bitcoins;
-		$fromCoins:	Type of Coin to send (Null default);
-		$change:	Address to send change;
-		$nocheck:	No check transaction;
-		$unsigned:	Unsigned val;
-		$replaceByFee:	Activate the RBF mode in transaction;
-		$password:	Password of wallet;
-	*/
-	public function payToMany($addresses, $fee = null, $feerate = null, $fromAddr = null, $fromCoins = null, $change = null, $nocheck = false, $unsigned = false, $replaceByFee = true, $password = null){
+	 *	$addresses:	Addresses and values to send -> [["addr", 0.001],["addr", 0.2]]
+	 *	$fee:		Fee in BTC to send;
+	 *	$feerate:	Feerate to send Bitcoins;
+	 *	$fromAddr:	Choose one address to get the Bitcoins;
+	 *	$fromCoins:	Type of Coin to send (Null default);
+	 *	$change:	Address to send change;
+	 *	$nocheck:	No check transaction;
+	 *	$unsigned:	Unsigned val;
+	 *	$replaceByFee:	Activate the RBF mode in transaction;
+	 */
+	public function payToMany($addresses, $fee = null, $feerate = null, $fromAddr = null, $fromCoins = null, $change = null, $nocheck = false, $unsigned = false, $replaceByFee = true){
 		
-		$params = [$addresses, $amount, $fee, $feerate, $fromAddr, $fromCoins, $change, $nocheck, $unsigned, $replaceByFee, $password, NULL, true, $this->wallet];
+		$params = [$addresses, $fee, $feerate, $fromAddr, $fromCoins, $change, $nocheck, $unsigned, $replaceByFee, $this->walletpass, NULL, true, $this->wallet];
 		return $this->call("payto", $params);
 		
 	}
 	
 	/*
-        $walletPath:	Wallet path;
-		$forgetconfig:	Forget config on exit;
-		$unlock:		Unlock the wallet (store the password in memory);
-		$password, 		Wallet password;
-	*/
-	public function loadWallet($walletPath, $forgetConfig = false, $unlock = true, $password = null){
+     *    $walletPath:	Wallet path;
+	 *	$password: 		Wallet password;
+	 */
+	public function loadWallet($walletPath, $password = NULL){
 		
-		$params = [$walletPath, $forgetConfig, $unlock, $password];
-        return $this->call('load_wallet', $params);
+		$params = [$walletPath, $password];
+        $response = $this->call('load_wallet', $params);
+		
+		if(!str_contains($response, 'Traceback')){
+			$this->wallet = $walletPath;
+			$this->walletpass = $password;
+			return true;
+		}else{
+			return false;
+		}
 		
     }
 	
