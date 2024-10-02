@@ -22,14 +22,15 @@ require_once(dirname(__FILE__) . "/path/to/autoload.php");
 
 use JeanKassio\ElectrumPHP;
 
-$walletPath = "/root/wallet";
+$walletPath = dirname(__FILE__) . "/wallet/walletfile";
 $walletPass = "0123456789";
 $rpcUser = "user";
 $rpcPass = "9876543210";
 $rpcPort = 7777;
 $rpcHost = "127.0.0.1";
+$binary = false; //if false, the code find automatically the binary of Electrum
 
-$electrum = new ElectrumPHP($walletPath, $walletPass, $rpcUser, $rpcPass, $rpcPort, $rpcHost);
+$electrum = new ElectrumPHP($walletPath, $walletPass, $rpcUser, $rpcPass, $rpcPort, $rpcHost, $binary);
 
 ```
 
@@ -56,7 +57,7 @@ if($electrum->isRunning()){
 ### Create a New Wallet and receive Seed
 
 ```php
-$walletPath = "/root/wallet";
+$walletPath = dirname(__FILE__) . "/wallet/walletfile";
 $seed = false;
 $password = "0123456789";
 $encrypt = true;
@@ -70,7 +71,7 @@ echo "Seed: " . $response['seed'];
 ### Create a New Wallet with your seed
 
 ```php
-$walletPath = "/root/wallet";
+$walletPath = dirname(__FILE__) . "/wallet/walletfile";
 $seed = "excess title assist very badge rain pet purchase device narrow awesome recall";
 $password = NULL;
 $encrypt = false;
@@ -89,6 +90,7 @@ echo "New address: " . $address;
 ### Get Address Balance
 
 ```php
+$address = "1PuJjnF476W3zXfVYmJfGnouzFDAXakkL4";
 $balance = $electrum->getAddressBalance($address);
 echo "Confirmed: " . $balance['confirmed'];
 echo "Unconfirmed: " . $balance['unconfirmed'];
@@ -98,9 +100,17 @@ echo "Unconfirmed: " . $balance['unconfirmed'];
 
 ```php
 $balance = $electrum->getWalletBalance();
-echo "Confirmed: " . $balance['confirmed'];
-echo "Unconfirmed: " . $balance['unconfirmed'];
-echo "Unmatured: " . $balance['unmatured'];
+if(isset($balance['confirmed'])){
+  echo "Confirmed: " . $balance['confirmed'];
+}
+				
+if(isset($balance['unconfirmed'])){
+  echo "Unconfirmed: " . $balance['unconfirmed'];
+}
+				
+if(isset($balance['unmatured'])){
+  echo "Unmatured: " . $balance['unmatured'];
+}
 ```
 
 ### Get Transaction Details
@@ -114,13 +124,13 @@ echo "Transaction details: " . json_encode($transaction);
 ### Pay to a Bitcoin Address
 
 ```php
-$address = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa";
+$address = "bc1qlaee57ehqfe2388muudvrf7wvuw2p3lwz0kzh4";
 $amount = 0.001;
 $fee = 0.00001;
 $feerate = NULL;
-$fromAddr = "bc1plgjpn3cr5khxfee0k40py8njx0qcejrqldldnedqrshvut64jlvs467hnr";
+$fromAddr = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa";
 $fromCoins = NULL;
-$change = "bc1pqys8mqkneumdyncyz42ljd5zl9gqw4pryd9xsj9gnx5cw6rlvn0sjhdlhy";
+$change = "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa";
 $nocheck = false;
 $unsigned = false;
 $replaceByFee = true;
@@ -132,7 +142,7 @@ echo "Payment response: " . json_encode($response);
 ### Pay to Multiple Addresses
 
 ```php
-$addressesTo = [
+$outputs = [
   [
     "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
     0.002
@@ -155,16 +165,15 @@ $nocheck = false;
 $unsigned = false;
 $replaceByFee = false;
 
-$response = $electrum->payToMany($addressesTo, $fee, $feerate, $fromAddr, $fromCoins, $change, $nocheck, $unsigned, $replaceByFee);
+$response = $electrum->payToMany($outputs, $fee, $feerate, $fromAddr, $fromCoins, $change, $nocheck, $unsigned, $replaceByFee);
 echo "Payment response: " . json_encode($response);
 ```
 
 ### Load a Wallet
 
 ```php
-$pathWallet = "path/to/wallet";
-$password = "0123456789";
-$electrum->loadWallet($pathWallet, $password);
+//Load the wallet instantiated
+$electrum->loadWallet();
 ```
 
 ### Get Wallets Currently Open
@@ -194,7 +203,7 @@ echo "Notification deleted: " . json_encode($response);
 ### Get Private Key of Address in wallet
 
 ```php
-$address = "bc1pce8yk5epjlqrpnnavelul54ed6663tjqv6taz3gq9cte979624uqjjrv55";
+$address = "bc1pce8yk5epjlqrpnnavelul54jjrv55";
 $privateKey = $electrum->getPrivateKeys($address);
 echo "Private key: " . $privateKey;
 ```
@@ -210,7 +219,9 @@ echo "Wallet seed: " . $seed;
 
 ```php
 $method = "getaddressunspent";
-$params = ["bc1pce8yk5epjlqrpnnavelul54ed6663tjqv6taz3gq9cte979624uqjjrv55"];
+$params = [
+  'address' => "bc1pce8yk5epjlqrpnnavelul54ed6663tjqv6taz3gq9cte979624uqjjrv55"
+];
 $response = $electrum->custom($method, $params);
 echo "Response: " . $response;
 ```
