@@ -1,0 +1,19 @@
+{
+    "name": "jeankassio/electrumphp",
+    "description": "PHP library to connect in Electrum JSON-RPC",
+    "type": "library",
+    "require": {
+        "php": ">=7.4"
+    },
+	"authors": [
+		{
+			"name": "Jean Kássio",
+			"email": "contato@jeankassio.dev"
+		}
+	],
+    "autoload": {
+        "psr-4": {
+            "JeanKassio\\ElectrumPHP\\": "src/"
+        }
+    }
+}
