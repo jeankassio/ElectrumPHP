@@ -1,6 +1,8 @@
 # ElectrumPHP
 ElectrumPHP is a PHP library designed to interact with the Electrum wallet through RPC calls. 
-With this library, you can manage wallets, generate addresses, check balances and transaction history, and make Bitcoin payments using the Electrum daemon.
+With this library, you can manage wallets, generate addresses, check balances, make Bitcoin payments and much more using the Electrum daemon.
+
+Update: You can also calculate the ideal estimated fee for your transaction before you make it.
 
 ## Requirements
 
@@ -236,6 +238,52 @@ $response = $electrum->custom($method, $params);
 echo "Response: " . $response;
 ```
 
+### Get estimate fee, bests inputs and suggest change address.
+
+```php
+
+$outputs = [
+	[
+		"bc1qq4khfcyhnds27zqc8wldxu97lzr7u233t8n3e3",
+		0.00010604
+	],
+	[
+		"bc1qrdzwvaj84lwlkclp6ruz6y4c6ac7whqltjl6w9",
+		0.00010000
+	]
+];
+
+$checkBalance = true;
+
+$infos = $electrum->getInfosBeforeTransaction($outputs, $checkBalance);
+echo json_encode($infos);
+
+```
+#### And result are:
+
+```json
+{
+   "error":false,
+   "msg":"Success",
+   "data":{
+      "inputs":"bc1pce8yk5epjlqrpnnavelul54ed6663tjqv6txxx,bc1pce8yk5epjlqrpnnavelul54ed6663tjqv6taz3",
+      "outputs":[
+         [
+            "bc1qq4khfcyhnds27zqc8wldxu97lzr7u233t8n3e3",
+            0.00010604
+         ],
+         [
+            "bc1qrdzwvaj84lwlkclp6ruz6y4c6ac7whqltjl6w9",
+            0.0001
+         ]
+      ],
+      "num_inputs":2,
+      "num_outputs":2,
+      "suggest_change":"bc1qlaee57ehqfe2388muudvrf7wvuw2p3lwz0kzh4",
+      "estimated_fee":"0.00000327"
+   }
+}
+```
 
 ## Error Handling
 ### Every RPC call that fails will throw an exception. 
