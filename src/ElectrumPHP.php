@@ -187,6 +187,20 @@ class ElectrumPHP{
 		
 	}
 	
+	/*
+	 *	$showAddresses:	Boolean, if show address in transactions;
+	 */
+	public function getWalletHistory($showAddresses, $fromHeight = NULL){
+		
+		$params = [
+			'show_addresses' => $showAddresses,
+			'wallet' => $this->wallet,
+			'from_height' => $fromHeight
+		];
+		return $this->call("onchain_history", $params);
+		
+	}
+	
 	public function getWalletBalance(){
 		
 		$params = [
@@ -296,16 +310,16 @@ class ElectrumPHP{
 		
 	}
 	
-	public function getAddressesWallet(){
+	public function getAddressesWallet($balance = false, $receiving = false, $change = false, $labels = false, $frozen = false, $unused = false, $funded = false){
 		
 		$params = [
-			'receiving' => false, 
-			'change' => false, 
-			'labels' => false, 
-			'frozen' => false, 
-			'unused' => false, 
-			'funded' => false, 
-			'balance' => false, 
+			'receiving' => $receiving, 
+			'change' => $change, 
+			'labels' => $labels, 
+			'frozen' => $frozen, 
+			'unused' => $unused, 
+			'funded' => $funded, 
+			'balance' => $balance, 
 			'wallet' => $this->wallet
 		];
 		return $this->call("listaddresses", $params);
@@ -412,6 +426,142 @@ class ElectrumPHP{
 		}
 		
     }
+	
+	public function getInfosBeforeTransaction($outputs, $checkBalance){
+		
+		$estimated_fee = 0;
+		$total_outputs = 0;
+		$selected_balance = 0;
+		$num_inputs = 0;
+		$num_outputs = count($outputs);
+		$inputs = [];
+		$change_address = '';
+		
+		$type_input_counts = ['P2PKH' => 0, 'P2SH' => 0, 'P2WPKH' => 0];
+		
+		foreach($outputs as $output){
+			$total_outputs += $output[1];
+		}
+		
+		$feerate = (($sbit = $this->getFeeRate()) !== false ? $sbit["sat/kvB"] : 10000);
+		
+		$addresses_with_balances = $this->getAddressesWallet(true);
+		
+		$filtered_addresses = [];
+		
+		foreach ($addresses_with_balances as $address_info){
+			
+			$address = $address_info[0];
+			$balance = floatval($address_info[1]);
+			
+			if($balance > 0){
+				$filtered_addresses[] = ['address' => $address, 'balance' => $balance];
+			}
+			
+		}
+		
+		usort($filtered_addresses, function($a, $b) {
+			return $b['balance'] - $a['balance'];
+		});
+		
+		foreach($filtered_addresses as $address_info){
+			
+			$address = $address_info['address'];
+			$balance = $address_info['balance'];
+			
+			$inputs[] = $address;
+			$selected_balance += $balance;
+			$num_inputs++;
+			
+			$type = $this->detectAddressType($address);
+			
+			if(isset($type_input_counts[$type])){
+				$type_input_counts[$type]++;
+			}
+			
+			$estimated_fee = $this->calculateFee($type_input_counts, $num_outputs, $feerate);
+			
+			if($selected_balance >= $total_outputs + $estimated_fee){
+				break;
+			}
+			
+		}
+		
+		if($selected_balance > ($total_outputs + $estimated_fee)){
+			
+			foreach($filtered_addresses as $address_info){
+				
+				if(!in_array($address_info['address'], $inputs)){
+					
+					$change_address = $address_info['address'];
+					break;
+					
+				}
+				
+			}
+			
+		}elseif($checkBalance){
+			
+			return [
+				'error' => true,
+				'msg' => "Insufficient balance",
+				'data' => []
+			];
+			
+		}
+		
+		$inputs_string = implode(',', $inputs);
+		
+		return [
+			'error' => false,
+			'msg' => "Success",
+			'data' => [
+				'inputs' => $inputs_string,
+				'outputs' => $outputs,
+				'num_inputs' => $num_inputs,
+				'num_outputs' => $num_outputs,
+				'suggest_change' => $change_address,
+				'estimated_fee' => $estimated_fee
+			]
+		];
+		
+	}
+
+	private function detectAddressType($address){
+		
+		if(strpos($address, '1') === 0){
+			return 'P2PKH';
+		}elseif (strpos($address, '3') === 0){
+			return 'P2SH';
+		}elseif (strpos($address, 'bc1') === 0){
+			return 'P2WPKH';
+		}
+		
+		return 'Unknown';
+		
+	}
+
+	private function calculateFee($type_input_counts, $num_outputs, $feerate){
+		
+		$size_per_input = [
+			'P2PKH' => 148,
+			'P2SH' => 91,
+			'P2WPKH' => 68
+		];
+		
+		$size = 0;
+		foreach ($type_input_counts as $type => $count){
+			if(isset($size_per_input[$type])){
+				$size += $size_per_input[$type] * $count;
+			}
+		}
+		
+		$size += ($num_outputs * 34) + 10;
+		
+		return number_format((($size / 1000) * $feerate) / 100000000, 8, ".", "");
+		
+	}
+
 	
 	private function getBinary(){
 		
