@@ -66,6 +66,15 @@ if($electrum->isRunning()){
 }
 ```
 
+### Validate a Bitcoin Address
+
+```php
+$address = "1PuJjnF476W3zXfVYmJfGnouzFDAXakkL4";
+$valid = $electrum->validate($address);
+echo "The Bitcoin address is " . ($valid ? "valid" : "invalid");
+```
+
+
 ### Create a New Wallet and receive Seed
 
 ```php
