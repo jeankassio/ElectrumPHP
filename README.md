@@ -14,12 +14,6 @@ Update: You can also calculate the ideal estimated fee for your transaction befo
 
 ## Installation
 
-### If you are installing on a web server, install Electrum directly on the user that will be used by the web server.
-
-```bash
-sudo -u www pip3 install https://download.electrum.org/4.5.5/Electrum-4.5.5.tar.gz
-```
-
 ### The package can be installed using Composer
 
 ```bash
