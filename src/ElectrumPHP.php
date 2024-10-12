@@ -268,6 +268,18 @@ class ElectrumPHP{
 	}
 	
 	/*
+	 *	$addr:	Bitcoin Address;
+	 */
+	public function validate($addr){
+		
+		$params = [
+			'address' => $addr
+		];
+		return $this->call("validateaddress", $params);
+		
+	}
+	
+	/*
 	 *	$privateKey:	Bitcoin Private Key;
 	 */
 	public function importPrivKey($privateKey){
