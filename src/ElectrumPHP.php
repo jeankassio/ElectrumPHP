@@ -30,7 +30,7 @@ class ElectrumPHP{
 	 *	$rpcpass:	Password RPC;
 	 *	$rpcport:	Port Used By RPC;
 	 */
-	public function start(){
+	public function start($repeat = true){
 		
 		if(!$this->isRunning()){
 			
@@ -47,7 +47,13 @@ class ElectrumPHP{
 			
 			$output = implode(" ", $output);
 			
-			if(str_contains($output, 'starting daemon') || str_contains($output, 'already running')){
+			if(str_contains($output, 'already running') && $repeat){
+				$this->stop();
+				sleep(1);
+				return $this->start(false);
+			}
+			
+			if(str_contains($output, 'starting daemon')){
 				return true;
 			}else{
 				throw new \Exception('Could not start Electrum daemon.');
@@ -61,19 +67,28 @@ class ElectrumPHP{
 	
     public function stop(){
 		
-		if($this->isRunning()){
-			
-			$params = [];
-			$response = $this->call("stop", $params);
-			
-			if(!is_array($response) && (str_contains($response, 'Daemon stopped') || str_contains($response, 'Connection refused'))){
-				return true;
-			}else{
-				throw new \Exception('Could not stop Electrum daemon.');
-			}
-			
-		}else{
+		$output = NULL;
+		$code = null;
+		
+		exec("{$this->binary} stop 2>&1", $output, $code);
+		
+		if(is_null($output)){
+			return false;
+		}
+		
+		$output = implode(" ", $output);
+		
+		if(str_contains($output, 'Daemon stopped')){
 			return true;
+		}
+			
+		$params = [];
+		$response = $this->call("stop", $params);
+		
+		if(!is_array($response) && (str_contains($response, 'Daemon stopped'))){
+			return true;
+		}else{
+			throw new \Exception('Could not stop Electrum daemon.');
 		}
 		
     }
@@ -433,6 +448,8 @@ class ElectrumPHP{
 				return (isset($response['connected']) && $response['connected']);
 			}
 			
+		}catch(\Exception $e){
+			return false;
 		}catch(Throwable $e){
 			return false;
 		}
@@ -577,7 +594,20 @@ class ElectrumPHP{
 	
 	private function getBinary(){
 		
-		$output = null;
+		$output = NULL;
+		$code = null;
+		
+		exec("electrum --help 2>&1", $output, $code);
+		
+		if(!is_null($output)){
+			
+			$output = implode(" ", $output);
+		
+			if(str_contains($output, 'usage: electrum')){
+				return "electrum";
+			}
+			
+		}
 		
 		exec("which electrum", $output);
 		
@@ -612,7 +642,7 @@ class ElectrumPHP{
         $response = curl_exec($ch);
 		
         if(curl_errno($ch)){
-			return false;
+			throw new \Exception('Curl error: ' . curl_error($ch));
         }
 		
         curl_close($ch);
