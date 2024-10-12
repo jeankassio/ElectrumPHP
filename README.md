@@ -6,7 +6,7 @@ Update: You can also calculate the ideal estimated fee for your transaction befo
 
 ## Requirements
 
-- PHP 7.4 or higher
+- PHP 8 or higher
 - Curl enabled
 - putenv enabled
 - exec enabled (to start Electrum)
