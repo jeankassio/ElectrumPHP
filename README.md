@@ -40,6 +40,10 @@ $electrum = new ElectrumPHP($walletPath, $walletPass, $rpcUser, $rpcPass, $rpcPo
 
 ```
 
+## Tips
+
+The recommendation is that you start it even if you know that the daemon is already running, as the "start" function checks whether the daemon is running and communicating correctly before trying to execute the code to start the daemon.
+
 ## Methods
 ### Start the Electrum Daemon (if you need)
 
