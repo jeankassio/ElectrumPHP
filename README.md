@@ -140,6 +140,15 @@ $transaction = $electrum->getTransaction($txid);
 echo "Transaction details: " . json_encode($transaction);
 ```
 
+### Get Number of Confirmations
+
+```php
+$txid = "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b";
+$confirmations = $electrum->getConfirmations($txid); //return int
+echo "Number of confirmations: {$confirmations}";
+```
+
+
 ### Pay to a Bitcoin Address
 
 ```php
