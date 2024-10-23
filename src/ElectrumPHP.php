@@ -317,7 +317,8 @@ class ElectrumPHP{
 			'txid' => $txid, 
 			'wallet' => $this->wallet
 		];
-		return $this->call("gettransaction", $params);
+		$raw = $this->call("gettransaction", $params);
+		return $this->deserialize($raw);
 		
 	}
 	
@@ -555,7 +556,16 @@ class ElectrumPHP{
 		];
 		
 	}
-
+	
+	private function deserialize($raw){
+		
+		$params = [
+			'tx' => $raw
+		];
+		return $this->call("deserialize", $params);
+		
+	}
+	
 	private function detectAddressType($address){
 		
 		if(strpos($address, '1') === 0){
