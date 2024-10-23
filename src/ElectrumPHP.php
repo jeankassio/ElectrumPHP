@@ -322,6 +322,20 @@ class ElectrumPHP{
 		
 	}
 	
+	/*
+	 *	$txid:	Your TXID;
+	 */
+	public function getConfirmations($txid){
+		
+		$params = [
+			'txid' => $txid, 
+			'wallet' => $this->wallet
+		];
+		$tr = $this->call("get_tx_status", $params);
+		return ($tr['confirmations'] ?? false);
+		
+	}
+	
 	public function checkSyncronization(){
 		
 		$params = [
