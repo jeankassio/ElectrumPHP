@@ -430,7 +430,7 @@ class ElectrumPHP{
 			'addtransaction' => true, 
 			'wallet' => $this->wallet
 		];
-		return $this->call("payto", $params);
+		return $this->call("paytomany", $params);
 		
 	}
 	
