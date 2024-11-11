@@ -164,7 +164,7 @@ $unsigned = false;
 $replaceByFee = true;
 
 $response = $electrum->pay($address, $amount, $fee, $feerate, $fromAddr, $fromCoins, $change, $nocheck, $unsigned, $replaceByFee);
-echo "Payment response: " . json_encode($response);
+echo "TXID: " . json_encode($response);
 ```
 
 ### Pay to Multiple Addresses
@@ -194,7 +194,7 @@ $unsigned = false;
 $replaceByFee = false;
 
 $response = $electrum->payToMany($outputs, $fee, $feerate, $fromAddr, $fromCoins, $change, $nocheck, $unsigned, $replaceByFee);
-echo "Payment response: " . json_encode($response);
+echo "TXID: " . json_encode($response);
 ```
 
 ### Load a Wallet
