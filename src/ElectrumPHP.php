@@ -398,7 +398,8 @@ class ElectrumPHP{
 			'addtransaction' => true, 
 			'wallet' => $this->wallet
 		];
-		return $this->call("payto", $params);
+		$raw = $this->call("payto", $params);
+		return $this->call("broadcast", [$raw]);
 		
 	}
 	
@@ -430,7 +431,8 @@ class ElectrumPHP{
 			'addtransaction' => true, 
 			'wallet' => $this->wallet
 		];
-		return $this->call("paytomany", $params);
+		$raw = $this->call("paytomany", $params);
+		return $this->call("broadcast", [$raw]);
 		
 	}
 	
@@ -652,7 +654,8 @@ class ElectrumPHP{
             'params' => $params,
             'id' => time()
         ]);
-
+		
+		
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $this->url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
@@ -665,6 +668,8 @@ class ElectrumPHP{
 
         $response = curl_exec($ch);
 		
+			
+			
         if(curl_errno($ch)){
 			throw new \Exception('Curl error: ' . curl_error($ch));
         }
